@@ -161,19 +161,37 @@
 
                 <!-- Pagination -->
                 <div id="paginationContainer" class="hidden mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-                        <div class="text-sm text-gray-700">
-                            Menampilkan <span id="showingFrom">1</span> - <span id="showingTo">10</span> dari <span id="totalItems">0</span> data
+                    <div class="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <div class="text-sm text-gray-700">
+                                Menampilkan <span id="showingFrom">1</span> - <span id="showingTo">10</span> dari <span id="totalItems">0</span> data
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <label for="itemsPerPage" class="text-sm text-gray-600">Per halaman:</label>
+                                <select id="itemsPerPage" class="text-sm border border-gray-300 rounded-md px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="flex items-center space-x-2">
+                            <button id="firstPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                ««
+                            </button>
                             <button id="prevPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Sebelumnya
+                                ‹ Sebelumnya
                             </button>
                             <div id="pageNumbers" class="flex space-x-1">
                                 <!-- Page numbers will be populated dynamically -->
                             </div>
                             <button id="nextPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Selanjutnya
+                                Selanjutnya ›
+                            </button>
+                            <button id="lastPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                »»
                             </button>
                         </div>
                     </div>
@@ -200,9 +218,12 @@
                 this.currentPage = 1;
                 this.itemsPerPage = 10;
                 this.maxPages = 5;
+                this.autoRefreshInterval = null;
+                this.autoRefreshMinutes = 30; // Auto refresh every 30 minutes
                 
                 this.initializeEventListeners();
                 this.loadData();
+                this.startAutoRefresh();
             }
 
             initializeEventListeners() {
@@ -226,12 +247,29 @@
                     this.loadData();
                 });
 
+                // Items per page selector
+                document.getElementById('itemsPerPage').addEventListener('change', (e) => {
+                    this.itemsPerPage = parseInt(e.target.value);
+                    this.currentPage = 1; // Reset to first page
+                    this.filterAndDisplayData();
+                });
+
                 // Pagination buttons
+                document.getElementById('firstPage').addEventListener('click', () => {
+                    if (this.currentPage > 1) {
+                        this.currentPage = 1;
+                        this.displayData();
+                        this.updatePagination();
+                        this.scrollToTable();
+                    }
+                });
+
                 document.getElementById('prevPage').addEventListener('click', () => {
                     if (this.currentPage > 1) {
                         this.currentPage--;
                         this.displayData();
                         this.updatePagination();
+                        this.scrollToTable();
                     }
                 });
 
@@ -241,6 +279,17 @@
                         this.currentPage++;
                         this.displayData();
                         this.updatePagination();
+                        this.scrollToTable();
+                    }
+                });
+
+                document.getElementById('lastPage').addEventListener('click', () => {
+                    const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+                    if (this.currentPage < totalPages) {
+                        this.currentPage = totalPages;
+                        this.displayData();
+                        this.updatePagination();
+                        this.scrollToTable();
                     }
                 });
             }
@@ -276,8 +325,21 @@
                     if (!response.ok) throw new Error('Gagal mengambil data');
                     
                     const csvText = await response.text();
+                    const previousYears = this.getAvailableYears();
+                    
                     this.parseCSV(csvText);
+                    
+                    const currentYears = this.getAvailableYears();
+                    const hasNewYears = this.checkForNewYears(previousYears, currentYears);
+                    
+                    // Always update year filter to reflect current data
                     this.setupYearFilter();
+                    
+                    // Show notification if new years were detected
+                    if (hasNewYears && previousYears.length > 0) {
+                        this.showNewYearNotification(currentYears.filter(year => !previousYears.includes(year)));
+                    }
+                    
                     this.filterAndDisplayData();
                     this.updateLastUpdated();
                     
@@ -495,12 +557,7 @@
                 dataTable.classList.remove('hidden');
                 noDataState.classList.add('hidden');
 
-                // Show pagination for all filters when data exceeds itemsPerPage
-                if (this.filteredData.length > this.itemsPerPage) {
-                    paginationContainer.classList.remove('hidden');
-                } else {
-                    paginationContainer.classList.add('hidden');
-                }
+                // Pagination will be handled in updatePagination method
 
                 // Calculate pagination for all filters
                 let displayData = this.filteredData;
@@ -663,10 +720,17 @@
             }
 
             updatePagination() {
-                if (this.filteredData.length <= this.itemsPerPage) return;
+                const paginationContainer = document.getElementById('paginationContainer');
+                
+                // Always show pagination if there's data, even if less than itemsPerPage
+                if (this.filteredData.length === 0) {
+                    paginationContainer.classList.add('hidden');
+                    return;
+                }
+
+                paginationContainer.classList.remove('hidden');
 
                 const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
-                const maxDisplayPages = Math.min(totalPages, this.maxPages);
                 
                 // Update pagination info
                 const startItem = (this.currentPage - 1) * this.itemsPerPage + 1;
@@ -677,30 +741,172 @@
                 document.getElementById('totalItems').textContent = this.filteredData.length;
                 
                 // Update navigation buttons
+                const firstBtn = document.getElementById('firstPage');
                 const prevBtn = document.getElementById('prevPage');
                 const nextBtn = document.getElementById('nextPage');
+                const lastBtn = document.getElementById('lastPage');
                 
+                firstBtn.disabled = this.currentPage === 1;
                 prevBtn.disabled = this.currentPage === 1;
-                nextBtn.disabled = this.currentPage >= maxDisplayPages;
+                nextBtn.disabled = this.currentPage >= totalPages;
+                lastBtn.disabled = this.currentPage >= totalPages;
                 
-                // Update page numbers
+                // Update page numbers with smart pagination
                 const pageNumbers = document.getElementById('pageNumbers');
                 pageNumbers.innerHTML = '';
                 
-                for (let i = 1; i <= maxDisplayPages; i++) {
-                    const pageBtn = document.createElement('button');
-                    pageBtn.className = `px-3 py-2 text-sm font-medium rounded-md ${
-                        i === this.currentPage 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                    }`;
-                    pageBtn.textContent = i;
-                    pageBtn.addEventListener('click', () => {
-                        this.currentPage = i;
-                        this.displayData();
-                        this.updatePagination();
+                // Calculate which pages to show
+                let startPage = 1;
+                let endPage = totalPages;
+                
+                if (totalPages > this.maxPages) {
+                    const halfMax = Math.floor(this.maxPages / 2);
+                    
+                    if (this.currentPage <= halfMax) {
+                        // Show first pages
+                        endPage = this.maxPages;
+                    } else if (this.currentPage >= totalPages - halfMax) {
+                        // Show last pages
+                        startPage = totalPages - this.maxPages + 1;
+                    } else {
+                        // Show pages around current
+                        startPage = this.currentPage - halfMax;
+                        endPage = this.currentPage + halfMax;
+                    }
+                }
+                
+                // Add first page and ellipsis if needed
+                if (startPage > 1) {
+                    this.createPageButton(1, pageNumbers);
+                    if (startPage > 2) {
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+                        ellipsis.textContent = '...';
+                        pageNumbers.appendChild(ellipsis);
+                    }
+                }
+                
+                // Add page numbers
+                for (let i = startPage; i <= endPage; i++) {
+                    this.createPageButton(i, pageNumbers);
+                }
+                
+                // Add ellipsis and last page if needed
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+                        ellipsis.textContent = '...';
+                        pageNumbers.appendChild(ellipsis);
+                    }
+                    this.createPageButton(totalPages, pageNumbers);
+                }
+            }
+
+            createPageButton(pageNum, container) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                    pageNum === this.currentPage 
+                        ? 'bg-blue-600 text-white shadow-sm' 
+                        : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50 hover:text-gray-700'
+                }`;
+                pageBtn.textContent = pageNum;
+                pageBtn.addEventListener('click', () => {
+                    this.currentPage = pageNum;
+                    this.displayData();
+                    this.updatePagination();
+                    this.scrollToTable();
+                });
+                container.appendChild(pageBtn);
+            }
+
+            scrollToTable() {
+                // Smooth scroll to table for better user experience
+                document.getElementById('dataTable').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }
+
+            getAvailableYears() {
+                const years = new Set();
+                
+                if (this.yearColumn !== -1 && this.rawData.length > 0) {
+                    this.rawData.forEach(row => {
+                        const year = row[this.headers[this.yearColumn]];
+                        if (year && year.toString().trim()) {
+                            years.add(year.toString().trim());
+                        }
                     });
-                    pageNumbers.appendChild(pageBtn);
+                }
+                
+                return Array.from(years).sort((a, b) => {
+                    const numA = parseInt(a);
+                    const numB = parseInt(b);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return numB - numA; // Descending order
+                    }
+                    return a.localeCompare(b);
+                });
+            }
+
+            checkForNewYears(previousYears, currentYears) {
+                if (previousYears.length === 0) return false;
+                
+                return currentYears.some(year => !previousYears.includes(year));
+            }
+
+            showNewYearNotification(newYears) {
+                // Create notification element
+                const notification = document.createElement('div');
+                notification.className = 'fixed top-20 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 fade-in';
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium">Data Tahun Baru Tersedia!</p>
+                            <p class="text-sm opacity-90">Tahun: ${newYears.join(', ')}</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 5000);
+            }
+
+            startAutoRefresh() {
+                // Clear existing interval if any
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                }
+                
+                // Set up auto refresh every 30 minutes
+                this.autoRefreshInterval = setInterval(() => {
+                    console.log('Auto-refreshing data...');
+                    this.loadData();
+                }, this.autoRefreshMinutes * 60 * 1000);
+                
+                console.log(`Auto-refresh enabled: every ${this.autoRefreshMinutes} minutes`);
+            }
+
+            stopAutoRefresh() {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.autoRefreshInterval = null;
+                    console.log('Auto-refresh disabled');
                 }
             }
 
@@ -727,5 +933,5 @@
         // Initialize dashboard
         const dashboard = new DataDashboard();
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ab05569493f894',t:'MTc1OTgxNTE3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ab1471916112b0',t:'MTc1OTgxNTc5NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
