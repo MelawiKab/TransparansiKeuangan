@@ -57,7 +57,7 @@
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         <div id="sidebar" class="sidebar sidebar-transition w-64 bg-white shadow-lg fixed md:relative h-full z-40 hidden">
-            <div class="p-6 border-b border-gray-200">
+            <div class="p-6 border-b border-gray-200 text-center">
                 <h1 class="text-xl font-bold text-gray-800">Transparansi Keuangan</h1>
                 <p class="text-sm text-gray-600 mt-1">Pemerintah Kabupaten Melawi</p>
             </div>
@@ -79,7 +79,7 @@
             
             <!-- Year Filter -->
             <div class="p-4 border-b border-gray-200">
-                <h3 class="text-sm font-semibold text-gray-700 mb-3">Filter Tahun</h3>
+                <h3 class="text-sm font-semibold text-gray-700 mb-3 text-center">Filter Tahun</h3>
                 <div id="yearFilter" class="space-y-2">
                     <div class="animate-pulse">
                         <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -122,9 +122,10 @@
 
             <!-- Data Table -->
             <div class="p-6">
-                <!-- Desktop Table -->
-                <div id="desktopTable" class="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="overflow-x-auto">
+                <!-- Responsive Table -->
+                <div id="dataTable" class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <!-- Desktop Table View -->
+                    <div id="desktopView" class="hidden lg:block overflow-x-auto">
                         <table class="w-full">
                             <thead id="tableHeader" class="bg-gray-50 border-b border-gray-200">
                                 <!-- Headers will be populated dynamically -->
@@ -142,11 +143,13 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
 
-                <!-- Mobile Cards -->
-                <div id="mobileCards" class="lg:hidden space-y-4">
-                    <!-- Cards will be populated dynamically -->
+                    <!-- Mobile Cards View -->
+                    <div id="mobileView" class="lg:hidden p-4">
+                        <div id="mobileCards" class="space-y-4">
+                            <!-- Cards will be populated dynamically -->
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- No Data State -->
@@ -481,19 +484,17 @@
                 const tableBody = document.getElementById('tableBody');
                 const mobileCards = document.getElementById('mobileCards');
                 const noDataState = document.getElementById('noDataState');
-                const desktopTable = document.getElementById('desktopTable');
+                const dataTable = document.getElementById('dataTable');
                 const paginationContainer = document.getElementById('paginationContainer');
 
                 if (this.filteredData.length === 0) {
-                    desktopTable.classList.add('hidden');
-                    mobileCards.classList.add('hidden');
+                    dataTable.classList.add('hidden');
                     paginationContainer.classList.add('hidden');
                     noDataState.classList.remove('hidden');
                     return;
                 }
 
-                desktopTable.classList.remove('hidden');
-                mobileCards.classList.remove('hidden');
+                dataTable.classList.remove('hidden');
                 noDataState.classList.add('hidden');
 
                 // Show pagination for all filters when data exceeds itemsPerPage
@@ -728,5 +729,5 @@
         // Initialize dashboard
         const dashboard = new DataDashboard();
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98aadce7b70c5ffa',t:'MTc1OTgxMzUyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98aafe36f68181ba',t:'MTc1OTgxNDg4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
