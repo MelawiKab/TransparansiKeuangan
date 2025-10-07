@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Data Interaktif</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .loading {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .sidebar-transition {
+            transition: all 0.3s ease;
+        }
+        
+        .table-hover:hover {
+            background-color: #f8fafc;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Mobile Menu Button -->
+    <button id="mobileMenuBtn" class="md:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar sidebar-transition w-64 bg-white shadow-lg fixed md:relative h-full z-40">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-800">Dashboard Data</h1>
+                <p class="text-sm text-gray-600 mt-1">Analisis Data Interaktif</p>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="p-4 border-b border-gray-200">
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Cari data..." 
+                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                    <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Year Filter -->
+            <div class="p-4 border-b border-gray-200">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Filter Tahun</h3>
+                <div id="yearFilter" class="space-y-2">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Refresh Button -->
+            <div class="p-4">
+                <button 
+                    id="refreshBtn" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                >
+                    <svg id="refreshIcon" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 md:ml-0">
+            <!-- Header -->
+            <div class="bg-white shadow-sm border-b border-gray-200 p-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 id="pageTitle" class="text-2xl font-bold text-gray-800">Semua Data</h2>
+                        <p id="dataCount" class="text-sm text-gray-600 mt-1">Memuat data...</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div id="loadingIndicator" class="hidden">
+                            <div class="loading w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                        </div>
+                        <div id="lastUpdated" class="text-xs text-gray-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="p-6">
+                <!-- Desktop Table -->
+                <div id="desktopTable" class="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead id="tableHeader" class="bg-gray-50 border-b border-gray-200">
+                                <!-- Headers will be populated dynamically -->
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-gray-200">
+                                <!-- Loading state -->
+                                <tr>
+                                    <td colspan="100%" class="px-6 py-12 text-center">
+                                        <div class="flex flex-col items-center">
+                                            <div class="loading w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mb-4"></div>
+                                            <p class="text-gray-500">Memuat data dari CSV...</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mobile Cards -->
+                <div id="mobileCards" class="lg:hidden space-y-4">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+                
+                <!-- No Data State -->
+                <div id="noDataState" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                    <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Tidak ada data ditemukan</h3>
+                    <p class="text-gray-500">Coba ubah filter atau kata kunci pencarian Anda.</p>
+                </div>
+
+                <!-- Pagination -->
+                <div id="paginationContainer" class="hidden mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                        <div class="text-sm text-gray-700">
+                            Menampilkan <span id="showingFrom">1</span> - <span id="showingTo">10</span> dari <span id="totalItems">0</span> data
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="prevPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Sebelumnya
+                            </button>
+                            <div id="pageNumbers" class="flex space-x-1">
+                                <!-- Page numbers will be populated dynamically -->
+                            </div>
+                            <button id="nextPage" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Selanjutnya
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
+
+    <script>
+        class DataDashboard {
+            constructor() {
+                this.csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvXupUsvQW2NlDv8bLGYPbPpDkWxBbHqx6PG9fYeF9hXo9sSqpXrR9NsqTtO8JWu4LdfrLPZLRYwbY/pub?gid=0&single=true&output=csv';
+                this.rawData = [];
+                this.filteredData = [];
+                this.selectedYear = 'all';
+                this.searchTerm = '';
+                this.headers = [];
+                this.yearColumn = null;
+                this.sortColumn = null;
+                this.sortDirection = 'asc';
+                this.currentPage = 1;
+                this.itemsPerPage = 10;
+                this.maxPages = 5;
+                
+                this.initializeEventListeners();
+                this.loadData();
+            }
+
+            initializeEventListeners() {
+                // Mobile menu toggle
+                document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                    this.toggleMobileMenu();
+                });
+
+                document.getElementById('mobileOverlay').addEventListener('click', () => {
+                    this.closeMobileMenu();
+                });
+
+                // Search functionality
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.searchTerm = e.target.value.toLowerCase();
+                    this.filterAndDisplayData();
+                });
+
+                // Refresh button
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.loadData();
+                });
+
+                // Pagination buttons
+                document.getElementById('prevPage').addEventListener('click', () => {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.displayData();
+                        this.updatePagination();
+                    }
+                });
+
+                document.getElementById('nextPage').addEventListener('click', () => {
+                    const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+                    if (this.currentPage < totalPages) {
+                        this.currentPage++;
+                        this.displayData();
+                        this.updatePagination();
+                    }
+                });
+            }
+
+            toggleMobileMenu() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('mobileOverlay');
+                
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('hidden');
+            }
+
+            closeMobileMenu() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('mobileOverlay');
+                
+                sidebar.classList.remove('open');
+                overlay.classList.add('hidden');
+            }
+
+            async loadData() {
+                this.showLoading(true);
+                
+                try {
+                    const response = await fetch(this.csvUrl);
+                    if (!response.ok) throw new Error('Gagal mengambil data');
+                    
+                    const csvText = await response.text();
+                    this.parseCSV(csvText);
+                    this.setupYearFilter();
+                    this.filterAndDisplayData();
+                    this.updateLastUpdated();
+                    
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showError('Gagal memuat data. Silakan coba lagi.');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            parseCSV(csvText) {
+                const lines = csvText.trim().split('\n');
+                if (lines.length < 2) throw new Error('Data CSV tidak valid');
+                
+                // Parse headers
+                this.headers = lines[0].split(',').map(header => header.trim().replace(/"/g, ''));
+                
+                // Find year column (look for 'tahun', 'year', or similar)
+                this.yearColumn = this.headers.findIndex(header => 
+                    header.toLowerCase().includes('tahun') || 
+                    header.toLowerCase().includes('year') ||
+                    header.toLowerCase().includes('thn')
+                );
+
+                // Parse data rows
+                this.rawData = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = this.parseCSVLine(lines[i]);
+                    if (values.length === this.headers.length) {
+                        const row = {};
+                        this.headers.forEach((header, index) => {
+                            row[header] = values[index];
+                        });
+                        this.rawData.push(row);
+                    }
+                }
+            }
+
+            parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                result.push(current.trim());
+                return result;
+            }
+
+            setupYearFilter() {
+                const yearFilter = document.getElementById('yearFilter');
+                const years = new Set();
+                
+                // Extract unique years
+                if (this.yearColumn !== -1) {
+                    this.rawData.forEach(row => {
+                        const year = row[this.headers[this.yearColumn]];
+                        if (year && year.toString().trim()) {
+                            years.add(year.toString().trim());
+                        }
+                    });
+                }
+
+                // Sort years
+                const sortedYears = Array.from(years).sort((a, b) => {
+                    const numA = parseInt(a);
+                    const numB = parseInt(b);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return numB - numA; // Descending order
+                    }
+                    return a.localeCompare(b);
+                });
+
+                // Create year filter UI
+                yearFilter.innerHTML = `
+                    <div class="year-option ${this.selectedYear === 'all' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'} px-3 py-2 rounded-lg cursor-pointer transition-colors duration-200" data-year="all">
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                            Semua Tahun
+                        </div>
+                        <div class="text-xs text-gray-500 ml-5">${this.rawData.length} data</div>
+                    </div>
+                `;
+
+                sortedYears.forEach(year => {
+                    const count = this.rawData.filter(row => 
+                        this.yearColumn !== -1 && row[this.headers[this.yearColumn]] === year
+                    ).length;
+                    
+                    yearFilter.innerHTML += `
+                        <div class="year-option ${this.selectedYear === year ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'} px-3 py-2 rounded-lg cursor-pointer transition-colors duration-200" data-year="${year}">
+                            <div class="flex items-center">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mr-3"></span>
+                                ${year}
+                            </div>
+                            <div class="text-xs text-gray-500 ml-5">${count} data</div>
+                        </div>
+                    `;
+                });
+
+                // Add click listeners
+                yearFilter.querySelectorAll('.year-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        const year = e.currentTarget.dataset.year;
+                        this.selectYear(year);
+                        this.closeMobileMenu();
+                    });
+                });
+            }
+
+            selectYear(year) {
+                this.selectedYear = year;
+                this.currentPage = 1; // Reset to first page when filter changes
+                
+                // Update UI
+                document.querySelectorAll('.year-option').forEach(option => {
+                    option.classList.remove('bg-blue-100', 'text-blue-800');
+                    option.classList.add('text-gray-700', 'hover:bg-gray-100');
+                });
+                
+                document.querySelector(`[data-year="${year}"]`).classList.remove('text-gray-700', 'hover:bg-gray-100');
+                document.querySelector(`[data-year="${year}"]`).classList.add('bg-blue-100', 'text-blue-800');
+                
+                this.filterAndDisplayData();
+            }
+
+            filterAndDisplayData() {
+                // Filter by year
+                let filtered = this.rawData;
+                if (this.selectedYear !== 'all' && this.yearColumn !== -1) {
+                    filtered = this.rawData.filter(row => 
+                        row[this.headers[this.yearColumn]] === this.selectedYear
+                    );
+                }
+
+                // Filter by search term
+                if (this.searchTerm) {
+                    filtered = filtered.filter(row => 
+                        Object.values(row).some(value => 
+                            value.toString().toLowerCase().includes(this.searchTerm)
+                        )
+                    );
+                    this.currentPage = 1; // Reset to first page when searching
+                }
+
+                // Apply sorting
+                if (this.sortColumn) {
+                    filtered.sort((a, b) => {
+                        let aVal = a[this.sortColumn] || '';
+                        let bVal = b[this.sortColumn] || '';
+                        
+                        // Try to parse as numbers for proper numeric sorting
+                        const aNum = parseFloat(aVal);
+                        const bNum = parseFloat(bVal);
+                        
+                        if (!isNaN(aNum) && !isNaN(bNum)) {
+                            return this.sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+                        }
+                        
+                        // String comparison
+                        aVal = aVal.toString().toLowerCase();
+                        bVal = bVal.toString().toLowerCase();
+                        
+                        if (this.sortDirection === 'asc') {
+                            return aVal.localeCompare(bVal);
+                        } else {
+                            return bVal.localeCompare(aVal);
+                        }
+                    });
+                }
+
+                this.filteredData = filtered;
+                this.displayData();
+                this.updatePageInfo();
+                this.updatePagination();
+            }
+
+            sortBy(column) {
+                if (this.sortColumn === column) {
+                    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.sortColumn = column;
+                    this.sortDirection = 'asc';
+                }
+                this.filterAndDisplayData();
+            }
+
+            displayData() {
+                const tableHeader = document.getElementById('tableHeader');
+                const tableBody = document.getElementById('tableBody');
+                const mobileCards = document.getElementById('mobileCards');
+                const noDataState = document.getElementById('noDataState');
+                const desktopTable = document.getElementById('desktopTable');
+                const paginationContainer = document.getElementById('paginationContainer');
+
+                if (this.filteredData.length === 0) {
+                    desktopTable.classList.add('hidden');
+                    mobileCards.classList.add('hidden');
+                    paginationContainer.classList.add('hidden');
+                    noDataState.classList.remove('hidden');
+                    return;
+                }
+
+                desktopTable.classList.remove('hidden');
+                mobileCards.classList.remove('hidden');
+                noDataState.classList.add('hidden');
+
+                // Show pagination for all filters when data exceeds itemsPerPage
+                if (this.filteredData.length > this.itemsPerPage) {
+                    paginationContainer.classList.remove('hidden');
+                } else {
+                    paginationContainer.classList.add('hidden');
+                }
+
+                // Calculate pagination for all filters
+                let displayData = this.filteredData;
+                let startIndex = 0;
+                
+                if (this.filteredData.length > this.itemsPerPage) {
+                    const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+                    const maxDisplayPages = Math.min(totalPages, this.maxPages);
+                    
+                    if (this.currentPage > maxDisplayPages) {
+                        this.currentPage = maxDisplayPages;
+                    }
+                    
+                    startIndex = (this.currentPage - 1) * this.itemsPerPage;
+                    const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredData.length);
+                    displayData = this.filteredData.slice(startIndex, endIndex);
+                }
+
+                // Filter headers to exclude TimeStamp
+                const displayHeaders = this.headers.filter(header => 
+                    !header.toLowerCase().includes('timestamp') && 
+                    !header.toLowerCase().includes('time stamp')
+                );
+
+                // Add No column at the beginning
+                const allHeaders = ['No', ...displayHeaders];
+
+                // Create desktop table header with sorting
+                tableHeader.innerHTML = `
+                    <tr>
+                        ${allHeaders.map(header => {
+                            let displayName = header;
+                            let sortable = header !== 'No';
+                            
+                            if (header === 'No') {
+                                displayName = 'No';
+                            } else if (header.toLowerCase().includes('nama') && header.toLowerCase().includes('data')) {
+                                displayName = 'Nama Dokumen';
+                            } else if (header.toLowerCase().includes('tahun') && !header.toLowerCase().includes('terbit')) {
+                                displayName = 'Tahun Terbit';
+                            } else if (header.toLowerCase().includes('link') && header.toLowerCase().includes('drive')) {
+                                displayName = 'Dokumen';
+                            }
+                            
+                            const sortIcon = this.sortColumn === header ? 
+                                (this.sortDirection === 'asc' ? '↑' : '↓') : '↕';
+                            
+                            return `
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortable ? 'cursor-pointer hover:bg-gray-100' : ''}" 
+                                    ${sortable ? `onclick="dashboard.sortBy('${header}')"` : ''}>
+                                    <div class="flex items-center">
+                                        ${displayName}
+                                        ${sortable ? `<span class="ml-1 text-gray-400">${sortIcon}</span>` : ''}
+                                    </div>
+                                </th>
+                            `;
+                        }).join('')}
+                    </tr>
+                `;
+
+                // Create desktop table body with auto-numbering
+                tableBody.innerHTML = displayData.map((row, index) => `
+                    <tr class="table-hover fade-in" style="animation-delay: ${index * 0.05}s">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                            ${startIndex + index + 1}
+                        </td>
+                        ${displayHeaders.map(header => {
+                            let cellContent = row[header] || '-';
+                            
+                            // If it's a link column, make it clickable
+                            if (header.toLowerCase().includes('link') || header.toLowerCase().includes('drive')) {
+                                if (cellContent !== '-' && cellContent.startsWith('http')) {
+                                    cellContent = `<a href="${cellContent}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">Lihat Dokumen</a>`;
+                                }
+                            }
+                            
+                            return `
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    ${cellContent}
+                                </td>
+                            `;
+                        }).join('')}
+                    </tr>
+                `).join('');
+
+                // Create mobile cards
+                mobileCards.innerHTML = displayData.map((row, index) => {
+                    const cardContent = displayHeaders.map(header => {
+                        let displayName = header;
+                        if (header.toLowerCase().includes('nama') && header.toLowerCase().includes('data')) {
+                            displayName = 'Nama Dokumen';
+                        } else if (header.toLowerCase().includes('tahun') && !header.toLowerCase().includes('terbit')) {
+                            displayName = 'Tahun Terbit';
+                        } else if (header.toLowerCase().includes('link') && header.toLowerCase().includes('drive')) {
+                            displayName = 'Dokumen';
+                        }
+
+                        let cellContent = row[header] || '-';
+                        if (header.toLowerCase().includes('link') || header.toLowerCase().includes('drive')) {
+                            if (cellContent !== '-' && cellContent.startsWith('http')) {
+                                cellContent = `<a href="${cellContent}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">Lihat Dokumen</a>`;
+                            }
+                        }
+
+                        return `
+                            <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
+                                <span class="text-sm font-medium text-gray-600 w-1/3">${displayName}:</span>
+                                <span class="text-sm text-gray-900 w-2/3 text-right">${cellContent}</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 fade-in" style="animation-delay: ${index * 0.05}s">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                    #${startIndex + index + 1}
+                                </span>
+                            </div>
+                            ${cardContent}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            updatePageInfo() {
+                const pageTitle = document.getElementById('pageTitle');
+                const dataCount = document.getElementById('dataCount');
+                
+                if (this.selectedYear === 'all') {
+                    pageTitle.textContent = 'Semua Data';
+                } else {
+                    pageTitle.textContent = `Data Tahun ${this.selectedYear}`;
+                }
+                
+                const totalText = this.searchTerm ? 
+                    `${this.filteredData.length} dari ${this.rawData.length} data` :
+                    `${this.filteredData.length} data`;
+                    
+                dataCount.textContent = totalText;
+            }
+
+            updateLastUpdated() {
+                const lastUpdated = document.getElementById('lastUpdated');
+                const now = new Date();
+                lastUpdated.textContent = `Terakhir diperbarui: ${now.toLocaleString('id-ID')}`;
+            }
+
+            showLoading(show) {
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                const refreshIcon = document.getElementById('refreshIcon');
+                
+                if (show) {
+                    loadingIndicator.classList.remove('hidden');
+                    refreshIcon.classList.add('loading');
+                } else {
+                    loadingIndicator.classList.add('hidden');
+                    refreshIcon.classList.remove('loading');
+                }
+            }
+
+            updatePagination() {
+                if (this.filteredData.length <= this.itemsPerPage) return;
+
+                const totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+                const maxDisplayPages = Math.min(totalPages, this.maxPages);
+                
+                // Update pagination info
+                const startItem = (this.currentPage - 1) * this.itemsPerPage + 1;
+                const endItem = Math.min(this.currentPage * this.itemsPerPage, this.filteredData.length);
+                
+                document.getElementById('showingFrom').textContent = startItem;
+                document.getElementById('showingTo').textContent = endItem;
+                document.getElementById('totalItems').textContent = this.filteredData.length;
+                
+                // Update navigation buttons
+                const prevBtn = document.getElementById('prevPage');
+                const nextBtn = document.getElementById('nextPage');
+                
+                prevBtn.disabled = this.currentPage === 1;
+                nextBtn.disabled = this.currentPage >= maxDisplayPages;
+                
+                // Update page numbers
+                const pageNumbers = document.getElementById('pageNumbers');
+                pageNumbers.innerHTML = '';
+                
+                for (let i = 1; i <= maxDisplayPages; i++) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.className = `px-3 py-2 text-sm font-medium rounded-md ${
+                        i === this.currentPage 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`;
+                    pageBtn.textContent = i;
+                    pageBtn.addEventListener('click', () => {
+                        this.currentPage = i;
+                        this.displayData();
+                        this.updatePagination();
+                    });
+                    pageNumbers.appendChild(pageBtn);
+                }
+            }
+
+            showError(message) {
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="100%" class="px-6 py-12 text-center">
+                            <div class="flex flex-col items-center">
+                                <svg class="w-16 h-16 text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <p class="text-red-600 font-medium">${message}</p>
+                                <button onclick="dashboard.loadData()" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                                    Coba Lagi
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Initialize dashboard
+        const dashboard = new DataDashboard();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98aac5e0257381ba',t:'MTc1OTgxMjU3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
